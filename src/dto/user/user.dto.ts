@@ -12,6 +12,19 @@ export class CreateUserDto {
   activityLevel: ActivityLevel;
 }
 
+export class UpdateUserDto {
+  username?: string;
+  email?: string;
+  password?: string;
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  gender?: Gender;
+  phoneNumber?: string;
+  activityLevel?: ActivityLevel;
+  profilePicture?: string;
+}
+
 export class UpdateUserProfileDto {
   firstName?: string;
   lastName?: string;
