@@ -27,11 +27,21 @@ describe('S3Service', () => {
 
   beforeEach(async () => {
     const mockS3ClientInstance = {
-      send: jest.fn(),
+      send: jest.fn<Promise<any>, [any]>(),
+      config: {},
+      destroy: jest.fn(),
+      middlewareStack: {
+        add: jest.fn(),
+        addRelativeTo: jest.fn(),
+        clone: jest.fn(),
+        concat: jest.fn(),
+        remove: jest.fn(),
+        resolve: jest.fn(),
+      },
     };
 
     (S3Client as jest.Mock).mockImplementation(() => mockS3ClientInstance);
-    mockS3Client = mockS3ClientInstance as jest.Mocked<S3Client>;
+    mockS3Client = mockS3ClientInstance as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -62,7 +72,7 @@ describe('S3Service', () => {
 
   describe('uploadFile', () => {
     it('should upload file to S3 successfully', async () => {
-      mockS3Client.send.mockResolvedValue({} as any);
+      (mockS3Client.send as unknown as jest.Mock).mockResolvedValue({});
 
       const result = await service.uploadFile(mockFile, 'test-folder', true);
 
@@ -74,7 +84,7 @@ describe('S3Service', () => {
 
   describe('deleteFile', () => {
     it('should delete file from S3 successfully', async () => {
-      mockS3Client.send.mockResolvedValue({} as any);
+      (mockS3Client.send as unknown as jest.Mock).mockResolvedValue({});
       await service.deleteFile('test-key');
       expect(mockS3Client.send).toHaveBeenCalledWith(expect.any(DeleteObjectCommand));
     });
@@ -89,4 +99,3 @@ describe('S3Service', () => {
     });
   });
 });
-
