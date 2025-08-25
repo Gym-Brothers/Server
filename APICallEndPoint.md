@@ -1,4 +1,4 @@
-# GYM Management System - API Endpoints Documentation
+# GYM Management System - Comprehensive API Endpoints Documentation
 
 ## Base URL
 ```
@@ -40,15 +40,6 @@ http://localhost:3000
 }
 ```
 
-**Response (Error - 401):**
-```json
-{
-  "message": "Invalid credentials",
-  "error": "Unauthorized",
-  "statusCode": 401
-}
-```
-
 ### 2. User Registration 🌐
 **POST** `/auth/register`
 
@@ -67,31 +58,580 @@ http://localhost:3000
 }
 ```
 
+---
+
+## 📹 Media Management Endpoints (S3 Integration)
+
+### 1. Upload Media (Video/Image)
+**POST** `/api/media/upload`
+
+**Headers:**
+```
+Content-Type: multipart/form-data
+Authorization: Bearer <token>
+```
+
+**Request (Form Data):**
+```
+files: [File, File?] // Video file and optional thumbnail
+metadata: JSON string
+```
+
+**Metadata JSON:**
+```json
+{
+  "title": "Proper Squat Form",
+  "description": "Demonstration of correct squat technique",
+  "type": "video",
+  "category": "exercise_demo",
+  "exerciseId": 123,
+  "trainingProgramId": 456,
+  "isPublic": true
+}
+```
+
 **Response (Success - 201):**
 ```json
 {
-  "message": "User registered successfully",
-  "user": {
-    "id": 2,
-    "username": "newuser",
-    "email": "user@example.com",
-    "firstName": "Jane",
-    "lastName": "Smith",
-    "dateOfBirth": "1990-05-15T00:00:00.000Z",
-    "gender": "female",
-    "phoneNumber": "+1234567890",
-    "activityLevel": "moderately_active",
+  "id": 1,
+  "title": "Proper Squat Form",
+  "type": "video",
+  "category": "exercise_demo",
+  "publicUrl": "https://gym-app-media.s3.amazonaws.com/coaches/1/exercise_demo/video.mp4",
+  "thumbnailS3Key": "coaches/1/exercise_demo/thumbnails/thumb.jpg",
+  "fileSize": 15728640,
+  "durationSeconds": 120,
+  "createdAt": "2025-08-25T10:30:00.000Z"
+}
+```
+
+### 2. Get Coach Media
+**GET** `/api/media/coach/{coachId}?category=exercise_demo`
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "title": "Proper Squat Form",
+    "type": "video",
+    "category": "exercise_demo",
+    "publicUrl": "https://gym-app-media.s3.amazonaws.com/...",
+    "viewCount": 245,
     "createdAt": "2025-08-25T10:30:00.000Z"
+  }
+]
+```
+
+### 3. Get Exercise Media
+**GET** `/api/media/exercise/{exerciseId}`
+
+### 4. Get Public Media 🌐
+**GET** `/api/media/public?category=exercise_demo`
+
+### 5. Delete Media
+**DELETE** `/api/media/{mediaId}`
+
+### 6. Get Presigned Upload URL
+**POST** `/api/media/upload-url`
+
+**Request:**
+```json
+{
+  "fileName": "squat-demo.mp4",
+  "contentType": "video/mp4",
+  "category": "exercise_demo"
+}
+```
+
+---
+
+## 🏋️ InBody Test & Body Composition Endpoints
+
+### 1. Create InBody Test
+**POST** `/api/inbody/test`
+
+**Request:**
+```json
+{
+  "weight": 75.5,
+  "height": 175.0,
+  "skeletalMuscleMass": 32.8,
+  "bodyFatMass": 12.3,
+  "bodyFatPercentage": 16.3,
+  "totalBodyWater": 45.2,
+  "proteinMass": 9.8,
+  "mineralMass": 3.2,
+  "visceralFatLevel": 8,
+  "basalMetabolicRate": 1680,
+  "leanBodyMass": 63.2,
+  "armMuscleMass": {"left": 3.2, "right": 3.1},
+  "legMuscleMass": {"left": 9.8, "right": 9.9},
+  "trunkMuscleMass": 23.5,
+  "bodyScore": 85,
+  "bodyType": "athletic",
+  "testDate": "2025-08-25T10:00:00.000Z",
+  "testLocation": "Main Gym",
+  "technicianName": "Dr. Smith"
+}
+```
+
+**Response (Success - 201):**
+```json
+{
+  "id": 1,
+  "userId": 2,
+  "weight": 75.5,
+  "bodyFatPercentage": 16.3,
+  "skeletalMuscleMass": 32.8,
+  "basalMetabolicRate": 1680,
+  "bodyScore": 85,
+  "testDate": "2025-08-25T10:00:00.000Z",
+  "createdAt": "2025-08-25T10:30:00.000Z"
+}
+```
+
+### 2. Get User's InBody Tests
+**GET** `/api/inbody/tests`
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "weight": 75.5,
+    "bodyFatPercentage": 16.3,
+    "skeletalMuscleMass": 32.8,
+    "testDate": "2025-08-25T10:00:00.000Z"
+  }
+]
+```
+
+### 3. Get Latest InBody Test
+**GET** `/api/inbody/latest`
+
+### 4. Get InBody Analysis
+**GET** `/api/inbody/analysis/{testId}`
+
+**Response:**
+```json
+{
+  "bmi": 24.7,
+  "bodyFatCategory": "Fitness",
+  "muscleMassCategory": "Excellent",
+  "metabolicAge": 25,
+  "hydrationStatus": "Well Hydrated",
+  "recommendations": [
+    "Focus on maintaining current muscle mass",
+    "Consider slight caloric deficit for fat loss"
+  ],
+  "targetCalories": 2200,
+  "targetProtein": 140,
+  "targetCarbs": 220,
+  "targetFat": 75
+}
+```
+
+### 5. Get Progress Analysis
+**GET** `/api/inbody/progress`
+
+**Response:**
+```json
+{
+  "weightChange": -2.3,
+  "bodyFatChange": -1.8,
+  "muscleMassChange": 0.8,
+  "waterChange": 0.5,
+  "bmrChange": 45,
+  "testPeriod": {
+    "from": "2025-07-25T10:00:00.000Z",
+    "to": "2025-08-25T10:00:00.000Z",
+    "days": 31
   }
 }
 ```
 
-**Response (Error - 400):**
+---
+
+## 🍎 Nutrition Planning Endpoints (AI-Powered)
+
+### 1. Create Personalized Nutrition Plan
+**POST** `/api/nutrition/plan`
+
+**Request:**
 ```json
 {
-  "message": "Username or email already exists",
-  "error": "Bad Request",
-  "statusCode": 400
+  "coachId": 1,
+  "inbodyTestId": 1,
+  "goal": "weight_loss",
+  "dietType": "high_protein",
+  "durationWeeks": 8,
+  "preferences": {
+    "allergies": ["nuts", "dairy"],
+    "foodPreferences": ["chicken", "fish", "vegetables"],
+    "foodsToAvoid": ["processed_foods"],
+    "mealsPerDay": 6
+  }
+}
+```
+
+**Response (Success - 201):**
+```json
+{
+  "id": 1,
+  "name": "Weight Loss Plan - High Protein",
+  "goal": "weight_loss",
+  "dietType": "high_protein",
+  "durationWeeks": 8,
+  "dailyCalories": 1800,
+  "proteinGrams": 140,
+  "carbsGrams": 135,
+  "fatGrams": 60,
+  "waterLiters": 2.6,
+  "mealsPerDay": 6,
+  "mealTiming": [
+    {"meal": "Breakfast", "time": "07:00", "calories": 450},
+    {"meal": "Morning Snack", "time": "10:00", "calories": 180},
+    {"meal": "Lunch", "time": "13:00", "calories": 540},
+    {"meal": "Afternoon Snack", "time": "16:00", "calories": 180},
+    {"meal": "Dinner", "time": "19:00", "calories": 360},
+    {"meal": "Evening Snack", "time": "21:00", "calories": 90}
+  ],
+  "supplements": [
+    {"name": "Whey Protein", "dosage": "25g", "timing": "Post-workout"},
+    {"name": "Multivitamin", "dosage": "1 tablet", "timing": "With breakfast"}
+  ]
+}
+```
+
+### 2. Get User's Nutrition Plans
+**GET** `/api/nutrition/plans`
+
+### 3. Get Nutrition Plan Details
+**GET** `/api/nutrition/plan/{planId}`
+
+### 4. Get Daily Meal Plan
+**GET** `/api/nutrition/plan/{planId}/day/{dayNumber}`
+
+**Response:**
+```json
+{
+  "day": {
+    "id": 1,
+    "dayNumber": 1,
+    "weekNumber": 1,
+    "name": "Day 1 - Week 1",
+    "totalCalories": 1800,
+    "totalProtein": 140,
+    "totalCarbs": 135,
+    "totalFat": 60,
+    "dailyTips": "Stay hydrated throughout the day",
+    "meals": [
+      {
+        "type": "breakfast",
+        "name": "Power Breakfast",
+        "suggestedTime": "07:00",
+        "calories": 450,
+        "protein": 35,
+        "carbs": 40,
+        "fat": 15,
+        "preparationTimeMinutes": 15,
+        "cookingInstructions": "Prepare ingredients the night before for quick assembly.",
+        "foodItems": [
+          {
+            "name": "Oatmeal",
+            "quantity": 1,
+            "unit": "cup",
+            "totalCalories": 150,
+            "totalProtein": 5,
+            "preparationNotes": "Cook with water or milk"
+          },
+          {
+            "name": "Greek Yogurt",
+            "quantity": 1,
+            "unit": "cup",
+            "totalCalories": 100,
+            "totalProtein": 17,
+            "preparationNotes": "Plain, low-fat"
+          }
+        ]
+      }
+    ]
+  },
+  "summary": {
+    "totalCalories": 1800,
+    "totalProtein": 140,
+    "mealsCount": 6
+  },
+  "hydrationSchedule": [
+    {"time": "07:00", "amount": 0.25, "type": "Water"},
+    {"time": "09:00", "amount": 0.25, "type": "Water"}
+  ]
+}
+```
+
+### 5. Get Weekly Meal Plan
+**GET** `/api/nutrition/plan/{planId}/week/{weekNumber}`
+
+### 6. Get Shopping List
+**GET** `/api/nutrition/shopping-list/{planId}?weeks=1,2`
+
+**Response:**
+```json
+{
+  "weeks": [1, 2],
+  "items": [
+    {
+      "name": "Chicken Breast",
+      "quantity": 2.5,
+      "unit": "kg",
+      "brand": null
+    },
+    {
+      "name": "Brown Rice",
+      "quantity": 1,
+      "unit": "kg",
+      "brand": null
+    }
+  ],
+  "totalItems": 15
+}
+```
+
+### 7. Get Meal Prep Guide
+**GET** `/api/nutrition/meal-prep/{planId}?week=1`
+
+**Response:**
+```json
+{
+  "week": 1,
+  "prepDay": "Sunday",
+  "estimatedTime": "2-3 hours",
+  "steps": [
+    "Shop for all ingredients",
+    "Prep vegetables and fruits",
+    "Cook proteins in batches"
+  ],
+  "batchCooking": {
+    "proteins": ["Chicken Breast", "Salmon"],
+    "grains": ["Brown Rice", "Quinoa"]
+  }
+}
+```
+
+---
+
+## 🏋️‍♂️ Training Program Endpoints
+
+### 1. Create Training Program (Coach Only)
+**POST** `/api/training/program`
+
+**Request:**
+```json
+{
+  "name": "Beginner Strength Building",
+  "description": "8-week program focused on building foundational strength",
+  "difficulty": "beginner",
+  "type": "strength",
+  "durationWeeks": 8,
+  "daysPerWeek": 3,
+  "estimatedDurationMinutes": 60,
+  "equipmentNeeded": ["barbell", "dumbbells", "bench"],
+  "targetMuscles": ["chest", "back", "legs", "shoulders"],
+  "isPublic": true,
+  "price": 99.99,
+  "currency": "USD"
+}
+```
+
+**Response (Success - 201):**
+```json
+{
+  "id": 1,
+  "name": "Beginner Strength Building",
+  "difficulty": "beginner",
+  "type": "strength",
+  "durationWeeks": 8,
+  "daysPerWeek": 3,
+  "estimatedDurationMinutes": 60,
+  "rating": 0,
+  "price": 99.99,
+  "isPublic": true,
+  "createdAt": "2025-08-25T10:30:00.000Z"
+}
+```
+
+### 2. Get User's Training Programs
+**GET** `/api/training/programs`
+
+### 3. Get Coach's Programs (Coach Only)
+**GET** `/api/training/coach/programs`
+
+### 4. Get Public Programs 🌐
+**GET** `/api/training/programs/public?type=strength&difficulty=beginner`
+
+### 5. Get Training Program Details
+**GET** `/api/training/program/{programId}`
+
+**Response:**
+```json
+{
+  "id": 1,
+  "name": "Beginner Strength Building",
+  "description": "8-week program focused on building foundational strength",
+  "difficulty": "beginner",
+  "type": "strength",
+  "coach": {
+    "id": 1,
+    "user": {
+      "firstName": "John",
+      "lastName": "Trainer"
+    }
+  },
+  "trainingDays": [
+    {
+      "id": 1,
+      "dayNumber": 1,
+      "weekNumber": 1,
+      "name": "Upper Body Strength",
+      "restDay": false,
+      "estimatedDurationMinutes": 60,
+      "focusAreas": ["chest", "back", "shoulders"],
+      "exercises": [
+        {
+          "id": 1,
+          "name": "Push-ups",
+          "type": "strength",
+          "sets": 3,
+          "reps": 12,
+          "restSeconds": 60,
+          "instructions": "Keep body straight, lower chest to floor",
+          "targetMuscles": ["chest", "triceps"],
+          "media": []
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 6. Assign Program to User (Coach Only)
+**PUT** `/api/training/program/{programId}/assign/{userId}`
+
+### 7. Get Daily Workout
+**GET** `/api/training/program/{programId}/day/{dayNumber}`
+
+**Response:**
+```json
+{
+  "day": {
+    "id": 1,
+    "dayNumber": 1,
+    "name": "Upper Body Strength",
+    "restDay": false,
+    "estimatedDurationMinutes": 60,
+    "focusAreas": ["chest", "back", "shoulders"],
+    "warmUpInstructions": "5-10 minutes of light cardio followed by dynamic stretching",
+    "coolDownInstructions": "5-10 minutes of static stretching and light walking"
+  },
+  "summary": {
+    "exerciseCount": 6,
+    "estimatedDuration": 60,
+    "isRestDay": false
+  },
+  "exercises": [
+    {
+      "name": "Push-ups",
+      "sets": 3,
+      "reps": 12,
+      "restSeconds": 60,
+      "instructions": "Keep body straight, lower chest to floor",
+      "media": [
+        {
+          "title": "Proper Push-up Form",
+          "publicUrl": "https://gym-app-media.s3.amazonaws.com/...",
+          "type": "video"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 8. Get Weekly Workout
+**GET** `/api/training/program/{programId}/week/{weekNumber}`
+
+### 9. Get User Progress
+**GET** `/api/training/program/{programId}/progress/{userId}`
+
+---
+
+## 🔍 Search Endpoints
+
+### 1. Search Coaches 🌐
+**GET** `/api/search/coaches?query=strength&specialization=weight_training&minRating=4.0&maxRate=100`
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "bio": "Certified strength and conditioning specialist",
+    "yearsOfExperience": 8,
+    "hourlyRate": 75.00,
+    "averageRating": 4.8,
+    "totalReviews": 156,
+    "isVerified": true,
+    "user": {
+      "firstName": "John",
+      "lastName": "Trainer",
+      "profilePicture": "https://..."
+    },
+    "specializations": [
+      {"name": "Strength Training"},
+      {"name": "Weight Loss"}
+    ]
+  }
+]
+```
+
+### 2. Search Training Programs 🌐
+**GET** `/api/search/programs?query=strength&type=muscle_gain&difficulty=intermediate&maxPrice=150`
+
+### 3. Search Media Content 🌐
+**GET** `/api/search/media?query=squat&category=exercise_demo&type=video`
+
+### 4. Global Search 🌐
+**GET** `/api/search/all?query=strength training`
+
+**Response:**
+```json
+{
+  "coaches": [
+    {
+      "id": 1,
+      "user": {
+        "firstName": "John",
+        "lastName": "Trainer"
+      },
+      "averageRating": 4.8
+    }
+  ],
+  "programs": [
+    {
+      "id": 1,
+      "name": "Beginner Strength Building",
+      "rating": 4.6
+    }
+  ],
+  "media": [
+    {
+      "id": 1,
+      "title": "Proper Squat Form",
+      "viewCount": 245
+    }
+  ],
+  "total": 8
 }
 ```
 
@@ -99,933 +639,136 @@ http://localhost:3000
 
 ## 👤 User Management Endpoints
 
-### 3. Get User Profile
+### 1. Get User Profile
 **GET** `/user/profile`
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "User profile retrieved successfully",
-  "user": {
-    "id": 1,
-    "username": "admin",
-    "email": "admin@gym.com",
-    "firstName": "John",
-    "lastName": "Doe",
-    "dateOfBirth": "1985-03-20T00:00:00.000Z",
-    "gender": "male",
-    "phoneNumber": "+1234567890",
-    "profilePicture": null,
-    "activityLevel": "very_active",
-    "addresses": [],
-    "emergencyContacts": [],
-    "createdAt": "2025-08-25T09:00:00.000Z",
-    "updatedAt": "2025-08-25T09:00:00.000Z"
-  }
-}
-```
-
-### 4. Update User Profile
+### 2. Update User Profile
 **PUT** `/user/profile`
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
+### 3. Get User Health Metrics
+**GET** `/user/health-metrics`
 
-**Request:**
-```json
-{
-  "firstName": "John Updated",
-  "lastName": "Doe Updated",
-  "phoneNumber": "+0987654321",
-  "activityLevel": "extremely_active",
-  "profilePicture": "https://example.com/profile.jpg"
-}
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Profile updated successfully",
-  "user": {
-    "id": 1,
-    "username": "admin",
-    "email": "admin@gym.com",
-    "firstName": "John Updated",
-    "lastName": "Doe Updated",
-    "phoneNumber": "+0987654321",
-    "activityLevel": "extremely_active",
-    "profilePicture": "https://example.com/profile.jpg",
-    "updatedAt": "2025-08-25T10:45:00.000Z"
-  }
-}
-```
-
-### 5. Get User Dashboard
-**GET** `/user/dashboard`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Welcome to your dashboard, admin!",
-  "data": {
-    "user": {
-      "firstName": "John",
-      "lastName": "Doe",
-      "profilePicture": "https://example.com/profile.jpg"
-    },
-    "stats": {
-      "activeSubscriptions": 2,
-      "totalWorkouts": 45,
-      "currentGoals": 3,
-      "memberSince": "2025-08-25T09:00:00.000Z"
-    },
-    "latestMetrics": {
-      "weight": 75.5,
-      "height": 180,
-      "bmi": 23.3,
-      "bodyFatPercentage": 15.2,
-      "recordedAt": "2025-08-24T08:00:00.000Z"
-    },
-    "activeCoaches": [
-      {
-        "id": 1,
-        "name": "Mike Johnson",
-        "specializations": ["strength_training", "weight_loss"],
-        "subscriptionType": "premium"
-      }
-    ],
-    "recentActivity": {
-      "lastLogin": "2025-08-25T10:30:00.000Z",
-      "weeklyGoalProgress": "75%"
-    }
-  }
-}
-```
-
-### 6. Delete User Account
-**DELETE** `/user/account`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Account successfully deleted",
-  "userId": 1
-}
-```
-
-**Response (Error - 400):**
-```json
-{
-  "message": "Cannot delete account with active subscriptions. Please cancel all subscriptions first.",
-  "error": "Bad Request",
-  "statusCode": 400
-}
-```
+### 4. Add Health Metrics
+**POST** `/user/health-metrics`
 
 ---
 
-## 🏋️ Coach Endpoints
+## 🎯 Coach Management Endpoints
 
-### 7. Search Coaches 🌐
-**GET** `/coach/search?specialization=strength_training&rating=4.0`
+### 1. Get Coach Profile
+**GET** `/coach/profile`
 
-**Query Parameters:**
-- `specialization` (optional): Filter by specialization
-- `rating` (optional): Minimum rating filter
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Coaches retrieved successfully",
-  "data": [
-    {
-      "id": 1,
-      "firstName": "Mike",
-      "lastName": "Johnson",
-      "bio": "Certified personal trainer with 10 years of experience",
-      "specializations": ["strength_training", "weight_loss"],
-      "averageRating": 4.8,
-      "totalReviews": 125,
-      "hourlyRate": 75.00,
-      "currency": "USD",
-      "isAvailable": true,
-      "yearsOfExperience": 10,
-      "profilePicture": "https://example.com/coach1.jpg"
-    }
-  ],
-  "pagination": {
-    "currentPage": 1,
-    "totalPages": 1,
-    "totalCount": 1
-  }
-}
-```
-
-### 8. Get Coach Profile 🌐
-**GET** `/coach/1`
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Coach profile retrieved successfully",
-  "data": {
-    "id": 1,
-    "firstName": "Mike",
-    "lastName": "Johnson",
-    "email": "mike@gym.com",
-    "bio": "Certified personal trainer with 10 years of experience",
-    "yearsOfExperience": 10,
-    "specializations": [
-      {
-        "id": 1,
-        "name": "strength_training",
-        "description": "Building muscle and strength"
-      }
-    ],
-    "certifications": [
-      {
-        "id": 1,
-        "name": "NASM-CPT",
-        "issuingOrganization": "NASM",
-        "issueDate": "2015-06-01T00:00:00.000Z",
-        "expiryDate": "2025-06-01T00:00:00.000Z",
-        "isVerified": true
-      }
-    ],
-    "averageRating": 4.8,
-    "totalReviews": 125,
-    "hourlyRate": 75.00,
-    "currency": "USD",
-    "maxClients": 20,
-    "currentClientCount": 15,
-    "isAvailable": true,
-    "isVerified": true,
-    "profilePicture": "https://example.com/coach1.jpg"
-  }
-}
-```
-
-### 9. Register as Coach
-**POST** `/coach/register`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "bio": "Experienced fitness trainer specializing in strength training",
-  "yearsOfExperience": 8,
-  "hourlyRate": 65.00,
-  "maxClients": 25,
-  "specializations": ["strength_training", "muscle_building"],
-  "certifications": [
-    {
-      "name": "ACSM-CPT",
-      "issuingOrganization": "ACSM",
-      "issueDate": "2017-03-15",
-      "expiryDate": "2027-03-15"
-    }
-  ]
-}
-```
-
-**Response (Success - 201):**
-```json
-{
-  "message": "Coach registration submitted successfully",
-  "data": {
-    "userId": 2,
-    "coachId": 2,
-    "status": "pending_verification",
-    "submittedAt": "2025-08-25T11:00:00.000Z"
-  }
-}
-```
-
-### 10. Get My Coach Profile
-**GET** `/coach/profile/me`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Coach profile retrieved successfully",
-  "data": {
-    "id": 2,
-    "firstName": "Sarah",
-    "lastName": "Wilson",
-    "bio": "Experienced fitness trainer specializing in strength training",
-    "yearsOfExperience": 8,
-    "hourlyRate": 65.00,
-    "maxClients": 25,
-    "currentClientCount": 12,
-    "isAvailable": true,
-    "isVerified": false,
-    "specializations": ["strength_training", "muscle_building"],
-    "certifications": [],
-    "averageRating": 0,
-    "totalReviews": 0
-  }
-}
-```
-
-### 11. Update Coach Profile
+### 2. Update Coach Profile
 **PUT** `/coach/profile`
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
+### 3. Get Coach Clients
+**GET** `/coach/clients`
 
-**Request:**
-```json
-{
-  "bio": "Updated bio with new specializations",
-  "hourlyRate": 70.00,
-  "isAvailable": false,
-  "maxClients": 30
-}
-```
+### 4. Get Coach Statistics
+**GET** `/coach/stats`
 
-**Response (Success - 200):**
-```json
-{
-  "message": "Coach profile updated successfully",
-  "data": {
-    "id": 2,
-    "bio": "Updated bio with new specializations",
-    "hourlyRate": 70.00,
-    "isAvailable": false,
-    "maxClients": 30,
-    "updatedAt": "2025-08-25T11:15:00.000Z"
-  }
-}
-```
+---
+
+## 📊 Health & Metrics Endpoints
+
+### 1. Get Health Overview
+**GET** `/health/overview`
+
+### 2. Add Fitness Goals
+**POST** `/health/fitness-goals`
+
+### 3. Update Medical History
+**PUT** `/health/medical-history`
 
 ---
 
 ## 💳 Subscription Endpoints
 
-### 12. Get Subscription Pricing 🌐
-**GET** `/subscription/pricing`
+### 1. Get Available Plans 🌐
+**GET** `/subscription/plans`
 
-**Response (Success - 200):**
+### 2. Subscribe to Plan
+**POST** `/subscription/subscribe`
+
+### 3. Get User Subscriptions
+**GET** `/subscription/user-subscriptions`
+
+### 4. Cancel Subscription
+**DELETE** `/subscription/{subscriptionId}`
+
+---
+
+## 📈 Analytics & Reporting
+
+### 1. Get User Analytics
+**GET** `/analytics/user-dashboard`
+
+### 2. Get Coach Analytics
+**GET** `/analytics/coach-dashboard`
+
+### 3. Get Progress Reports
+**GET** `/analytics/progress-report?period=monthly`
+
+---
+
+## Error Responses
+
+All endpoints may return these common error responses:
+
+**401 Unauthorized:**
 ```json
 {
-  "message": "Subscription pricing retrieved successfully",
-  "data": [
-    {
-      "type": "basic",
-      "monthlyPrice": 49.99,
-      "currency": "USD",
-      "features": {
-        "personalTrainingSessions": 2,
-        "groupSessions": 8,
-        "nutritionPlanning": false,
-        "progressTracking": true,
-        "customWorkouts": false
-      },
-      "description": "Perfect for beginners starting their fitness journey"
-    },
-    {
-      "type": "premium",
-      "monthlyPrice": 99.99,
-      "currency": "USD",
-      "features": {
-        "personalTrainingSessions": 4,
-        "groupSessions": 12,
-        "nutritionPlanning": true,
-        "progressTracking": true,
-        "customWorkouts": true
-      },
-      "description": "Comprehensive fitness package for serious athletes"
-    },
-    {
-      "type": "vip",
-      "monthlyPrice": 199.99,
-      "currency": "USD",
-      "features": {
-        "personalTrainingSessions": 8,
-        "groupSessions": 20,
-        "nutritionPlanning": true,
-        "progressTracking": true,
-        "customWorkouts": true
-      },
-      "description": "Premium experience with maximum personal attention"
-    },
-    {
-      "type": "personal_training",
-      "monthlyPrice": 149.99,
-      "currency": "USD",
-      "features": {
-        "personalTrainingSessions": 6,
-        "groupSessions": 0,
-        "nutritionPlanning": true,
-        "progressTracking": true,
-        "customWorkouts": true
-      },
-      "description": "One-on-one personal training focused experience"
-    }
-  ]
+  "message": "Unauthorized",
+  "statusCode": 401
 }
 ```
 
-### 13. Create Subscription
-**POST** `/subscription`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
+**403 Forbidden:**
 ```json
 {
-  "coachId": 1,
-  "type": "premium",
-  "startDate": "2025-09-01",
-  "endDate": "2025-12-01",
-  "personalTrainingSessions": 4,
-  "groupSessions": 12,
-  "nutritionPlanning": true,
-  "progressTracking": true,
-  "customWorkouts": true,
-  "paymentMethod": "credit_card"
+  "message": "Insufficient permissions",
+  "statusCode": 403
 }
 ```
 
-**Response (Success - 201):**
+**404 Not Found:**
 ```json
 {
-  "message": "Subscription created successfully",
-  "data": {
-    "id": 1,
-    "userId": 2,
-    "coachId": 1,
-    "type": "premium",
-    "status": "pending",
-    "startDate": "2025-09-01T00:00:00.000Z",
-    "endDate": "2025-12-01T00:00:00.000Z",
-    "monthlyPrice": 99.99,
-    "totalPrice": 299.97,
-    "personalTrainingSessions": 4,
-    "groupSessions": 12,
-    "nutritionPlanning": true,
-    "progressTracking": true,
-    "customWorkouts": true,
-    "paymentMethod": "credit_card",
-    "nextPaymentDate": "2025-10-01T00:00:00.000Z",
-    "createdAt": "2025-08-25T11:30:00.000Z"
-  }
+  "message": "Resource not found",
+  "statusCode": 404
 }
 ```
 
-### 14. Get My Subscriptions
-**GET** `/subscription`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (Success - 200):**
+**500 Internal Server Error:**
 ```json
 {
-  "message": "Subscriptions retrieved successfully",
-  "data": [
-    {
-      "id": 1,
-      "userId": 2,
-      "coachId": 1,
-      "coachName": "Mike Johnson",
-      "type": "premium",
-      "status": "active",
-      "startDate": "2025-09-01T00:00:00.000Z",
-      "endDate": "2025-12-01T00:00:00.000Z",
-      "monthlyPrice": 99.99,
-      "totalPrice": 299.97,
-      "currency": "USD",
-      "personalTrainingSessions": 4,
-      "groupSessions": 12,
-      "nutritionPlanning": true,
-      "progressTracking": true,
-      "customWorkouts": true,
-      "nextPaymentDate": "2025-10-01T00:00:00.000Z",
-      "sessionsUsed": {
-        "personal": 2,
-        "group": 5
-      },
-      "sessionsRemaining": {
-        "personal": 2,
-        "group": 7
-      }
-    }
-  ]
-}
-```
-
-### 15. Get Subscription Details
-**GET** `/subscription/1`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Subscription details retrieved successfully",
-  "data": {
-    "id": 1,
-    "userId": 2,
-    "coach": {
-      "id": 1,
-      "firstName": "Mike",
-      "lastName": "Johnson",
-      "bio": "Certified personal trainer with 10 years of experience",
-      "specializations": ["strength_training", "weight_loss"],
-      "averageRating": 4.8
-    },
-    "type": "premium",
-    "status": "active",
-    "startDate": "2025-09-01T00:00:00.000Z",
-    "endDate": "2025-12-01T00:00:00.000Z",
-    "monthlyPrice": 99.99,
-    "totalPrice": 299.97,
-    "currency": "USD",
-    "personalTrainingSessions": 4,
-    "groupSessions": 12,
-    "nutritionPlanning": true,
-    "progressTracking": true,
-    "customWorkouts": true,
-    "paymentMethod": "credit_card",
-    "nextPaymentDate": "2025-10-01T00:00:00.000Z"
-  }
-}
-```
-
-### 16. Update Subscription
-**PUT** `/subscription/1`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "type": "vip",
-  "personalTrainingSessions": 8,
-  "groupSessions": 20
-}
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Subscription updated successfully",
-  "data": {
-    "id": 1,
-    "type": "vip",
-    "personalTrainingSessions": 8,
-    "groupSessions": 20,
-    "monthlyPrice": 199.99,
-    "updatedAt": "2025-08-25T12:00:00.000Z"
-  }
-}
-```
-
-### 17. Cancel Subscription
-**POST** `/subscription/1/cancel`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "reason": "Moving to different city",
-  "cancellationDate": "2025-09-15"
-}
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Subscription cancelled successfully",
-  "data": {
-    "subscriptionId": 1,
-    "status": "cancelled",
-    "cancellationDate": "2025-09-15T00:00:00.000Z",
-    "reason": "Moving to different city",
-    "refundAmount": 149.99
-  }
+  "message": "Internal server error",
+  "statusCode": 500
 }
 ```
 
 ---
 
-## 🏥 Health Management Endpoints
+## Mobile App Integration Notes
 
-### 18. Create Health Metrics
-**POST** `/health/metrics`
+### File Upload Guidelines
+- **Video files**: Max 100MB, formats: .mp4, .mov, .avi
+- **Image files**: Max 10MB, formats: .jpg, .jpeg, .png
+- **Thumbnails**: Recommended 16:9 aspect ratio, 1280x720px
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
+### Rate Limiting
+- **Authentication endpoints**: 5 requests per minute
+- **File uploads**: 10 requests per hour
+- **Search endpoints**: 100 requests per minute
+- **Other endpoints**: 1000 requests per hour
 
-**Request:**
-```json
-{
-  "weight": 75.5,
-  "height": 180,
-  "bodyFatPercentage": 15.2,
-  "muscleMass": 65.3,
-  "restingHeartRate": 62,
-  "bloodPressureSystolic": 120,
-  "bloodPressureDiastolic": 80,
-  "notes": "Feeling great after workout routine"
-}
-```
-
-**Response (Success - 201):**
-```json
-{
-  "message": "Health metrics recorded successfully",
-  "data": {
-    "id": 1,
-    "userId": 2,
-    "weight": 75.5,
-    "height": 180,
-    "bmi": 23.3,
-    "bodyFatPercentage": 15.2,
-    "muscleMass": 65.3,
-    "restingHeartRate": 62,
-    "bloodPressureSystolic": 120,
-    "bloodPressureDiastolic": 80,
-    "notes": "Feeling great after workout routine",
-    "recordedAt": "2025-08-25T12:15:00.000Z",
-    "createdAt": "2025-08-25T12:15:00.000Z"
-  }
-}
-```
-
-### 19. Get Health Metrics
-**GET** `/health/metrics`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Health metrics retrieved successfully",
-  "data": {
-    "userId": 2,
-    "metrics": [
-      {
-        "id": 1,
-        "weight": 75.5,
-        "height": 180,
-        "bmi": 23.3,
-        "bodyFatPercentage": 15.2,
-        "muscleMass": 65.3,
-        "restingHeartRate": 62,
-        "bloodPressureSystolic": 120,
-        "bloodPressureDiastolic": 80,
-        "notes": "Feeling great after workout routine",
-        "recordedAt": "2025-08-25T12:15:00.000Z"
-      }
-    ],
-    "totalRecords": 1
-  }
-}
-```
-
-### 20. Update Health Metrics
-**PUT** `/health/metrics/1`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "weight": 74.8,
-  "bodyFatPercentage": 14.9,
-  "notes": "Weight loss progress continuing"
-}
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Health metrics updated successfully",
-  "data": {
-    "id": 1,
-    "weight": 74.8,
-    "height": 180,
-    "bmi": 23.1,
-    "bodyFatPercentage": 14.9,
-    "notes": "Weight loss progress continuing",
-    "updatedAt": "2025-08-25T12:30:00.000Z"
-  }
-}
-```
-
-### 21. Create Medical History
-**POST** `/health/medical-history`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "bloodType": "O+",
-  "allergies": ["peanuts", "shellfish"],
-  "medications": ["multivitamin"],
-  "medicalConditions": [],
-  "injuries": ["knee injury - 2020"],
-  "surgeries": [],
-  "familyHistory": ["diabetes - father", "hypertension - mother"],
-  "smokingStatus": "never",
-  "alcoholConsumption": "occasional",
-  "exerciseHistory": "Regular gym-goer for 3 years",
-  "notes": "Overall good health, careful with knee during workouts"
-}
-```
-
-**Response (Success - 201):**
-```json
-{
-  "message": "Medical history recorded successfully",
-  "data": {
-    "id": 1,
-    "userId": 2,
-    "bloodType": "O+",
-    "allergies": ["peanuts", "shellfish"],
-    "medications": ["multivitamin"],
-    "medicalConditions": [],
-    "injuries": ["knee injury - 2020"],
-    "surgeries": [],
-    "familyHistory": ["diabetes - father", "hypertension - mother"],
-    "smokingStatus": "never",
-    "alcoholConsumption": "occasional",
-    "exerciseHistory": "Regular gym-goer for 3 years",
-    "notes": "Overall good health, careful with knee during workouts",
-    "createdAt": "2025-08-25T12:45:00.000Z"
-  }
-}
-```
-
-### 22. Get Medical History
-**GET** `/health/medical-history`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Medical history retrieved successfully",
-  "data": {
-    "id": 1,
-    "userId": 2,
-    "bloodType": "O+",
-    "allergies": ["peanuts", "shellfish"],
-    "medications": ["multivitamin"],
-    "medicalConditions": [],
-    "injuries": ["knee injury - 2020"],
-    "surgeries": [],
-    "familyHistory": ["diabetes - father", "hypertension - mother"],
-    "smokingStatus": "never",
-    "alcoholConsumption": "occasional",
-    "exerciseHistory": "Regular gym-goer for 3 years",
-    "notes": "Overall good health, careful with knee during workouts",
-    "createdAt": "2025-08-25T12:45:00.000Z",
-    "updatedAt": "2025-08-25T12:45:00.000Z"
-  }
-}
-```
-
-### 23. Update Medical History
-**PUT** `/health/medical-history`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "medications": ["multivitamin", "protein powder"],
-  "notes": "Added protein supplement to routine"
-}
-```
-
-**Response (Success - 200):**
-```json
-{
-  "message": "Medical history updated successfully",
-  "data": {
-    "id": 1,
-    "userId": 2,
-    "medications": ["multivitamin", "protein powder"],
-    "notes": "Added protein supplement to routine",
-    "updatedAt": "2025-08-25T13:00:00.000Z"
-  }
-}
-```
+### WebSocket Events (Real-time Features)
+- **workout_started**: When user begins a workout
+- **progress_updated**: When metrics are updated
+- **coach_message**: Real-time coaching messages
+- **plan_updated**: When nutrition/training plans are modified
 
 ---
 
-## 📋 Common Response Formats
-
-### Success Response Structure
-```json
-{
-  "message": "Operation completed successfully",
-  "data": { /* Response data */ }
-}
-```
-
-### Error Response Structure
-```json
-{
-  "message": "Error description",
-  "error": "Error Type",
-  "statusCode": 400
-}
-```
-
-### Pagination Structure (when applicable)
-```json
-{
-  "message": "Data retrieved successfully",
-  "data": [ /* Array of items */ ],
-  "pagination": {
-    "currentPage": 1,
-    "totalPages": 5,
-    "totalCount": 50,
-    "limit": 10
-  }
-}
-```
-
----
-
-## 🔧 HTTP Status Codes
-
-- **200** - OK (Success)
-- **201** - Created (Resource created successfully)
-- **400** - Bad Request (Invalid request data)
-- **401** - Unauthorized (Authentication required)
-- **403** - Forbidden (Insufficient permissions)
-- **404** - Not Found (Resource not found)
-- **409** - Conflict (Resource already exists)
-- **500** - Internal Server Error (Server error)
-
----
-
-## 📝 Data Types & Enums
-
-### Gender Enum
-```
-"male" | "female" | "other"
-```
-
-### Activity Level Enum
-```
-"sedentary" | "lightly_active" | "moderately_active" | "very_active" | "extremely_active"
-```
-
-### Subscription Type Enum
-```
-"basic" | "premium" | "vip" | "personal_training"
-```
-
-### Subscription Status Enum
-```
-"active" | "inactive" | "pending" | "expired" | "cancelled"
-```
-
-### Goal Type Enum
-```
-"weight_loss" | "weight_gain" | "muscle_building" | "strength_training" | "endurance" | "general_fitness" | "rehabilitation" | "sports_performance"
-```
-
-### Blood Type Enum
-```
-"A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-"
-```
-
----
-
-## 🚀 Getting Started
-
-1. **Start the server:**
-   ```bash
-   cd /Users/abushiyyab/Desktop/GYM/Server
-   yarn start:dev
-   ```
-
-2. **Test with cURL:**
-   ```bash
-   # Register a new user
-   curl -X POST http://localhost:3000/auth/register \
-     -H "Content-Type: application/json" \
-     -d '{"username":"testuser","email":"test@example.com","password":"password123","firstName":"Test","lastName":"User","dateOfBirth":"1990-01-01","gender":"male","phoneNumber":"+1234567890","activityLevel":"moderately_active"}'
-
-   # Login
-   curl -X POST http://localhost:3000/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"username":"testuser","password":"password123"}'
-
-   # Get user profile (replace TOKEN with actual token)
-   curl -X GET http://localhost:3000/user/profile \
-     -H "Authorization: Bearer TOKEN"
-   ```
-
-3. **Use with Postman:**
-   - Import the endpoints into Postman
-   - Set up environment variables for base URL and token
-   - Use the Bearer Token authentication type for protected endpoints
+*Last Updated: August 25, 2025*
+*API Version: 2.0.0*

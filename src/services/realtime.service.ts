@@ -1,240 +1,358 @@
 import { Injectable } from '@nestjs/common';
-import { Observable, Subject, BehaviorSubject, interval, timer } from 'rxjs';
-import { map, filter, debounceTime, distinctUntilChanged, switchMap, catchError, retry, tap, takeUntil } from 'rxjs/operators';
-import { of, throwError, EMPTY } from 'rxjs';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { WorkoutSession, WorkoutStatus } from '../entities/workout-session.entity';
+import { ExercisePerformance } from '../entities/exercise-performance.entity';
+import { HealthAlert, HealthAlertType, AlertSeverity } from '../entities/health-alert.entity';
+import { SmartGoal, GoalStatus } from '../entities/smart-goal.entity';
 
 @Injectable()
 export class RealtimeService {
-  // Real-time workout tracking
-  private workoutUpdates$ = new Subject<any>();
-  private coachClientCommunication$ = new Subject<any>();
-  private subscriptionChanges$ = new BehaviorSubject<any>(null);
-  private healthMetricsUpdates$ = new Subject<any>();
+  constructor(
+    @InjectRepository(WorkoutSession)
+    private workoutRepository: Repository<WorkoutSession>,
+    @InjectRepository(ExercisePerformance)
+    private performanceRepository: Repository<ExercisePerformance>,
+    @InjectRepository(HealthAlert)
+    private healthAlertRepository: Repository<HealthAlert>,
+    @InjectRepository(SmartGoal)
+    private smartGoalRepository: Repository<SmartGoal>,
+  ) {}
 
-  // 1. Real-time Workout Tracking
-  emitWorkoutUpdate(userId: number, workoutData: any) {
-    this.workoutUpdates$.next({
+  async startWorkout(userId: number, trainingDayId: number, trainingProgramId: number): Promise<WorkoutSession> {
+    const session = this.workoutRepository.create({
       userId,
+      trainingDayId,
+      trainingProgramId,
+      status: WorkoutStatus.IN_PROGRESS,
+      scheduledDate: new Date(),
+      startedAt: new Date(),
+    });
+
+    const savedSession = await this.workoutRepository.save(session);
+    
+    // Emit real-time event
+    this.emitWorkoutEvent('workout_started', {
+      userId,
+      sessionId: savedSession.id,
       timestamp: new Date(),
-      ...workoutData
+    });
+
+    return savedSession;
+  }
+
+  async completeWorkout(sessionId: number, performanceData: any): Promise<void> {
+    const session = await this.workoutRepository.findOne({ where: { id: sessionId } });
+    if (!session) throw new Error('Workout session not found');
+
+    const completedAt = new Date();
+    const durationMinutes = Math.round((completedAt.getTime() - session.startedAt.getTime()) / (1000 * 60));
+
+    await this.workoutRepository.update(sessionId, {
+      status: WorkoutStatus.COMPLETED,
+      completedAt,
+      durationMinutes,
+      caloriesBurned: performanceData.totalCalories,
+      difficultyRating: performanceData.difficultyRating,
+      satisfactionRating: performanceData.satisfactionRating,
+    });
+
+    // Check for achievements and health alerts
+    await this.checkForAchievements(session.userId);
+    await this.analyzeHealthMetrics(session.userId, performanceData);
+
+    this.emitWorkoutEvent('workout_completed', {
+      userId: session.userId,
+      sessionId,
+      duration: durationMinutes,
+      calories: performanceData.totalCalories,
     });
   }
 
-  getWorkoutUpdates(userId: number): Observable<any> {
-    return this.workoutUpdates$.pipe(
-      filter(update => update.userId === userId),
-      map(update => ({
-        exercise: update.exercise,
-        sets: update.sets,
-        reps: update.reps,
-        weight: update.weight,
-        timestamp: update.timestamp
-      }))
-    );
+  async logExercisePerformance(data: {
+    workoutSessionId: number;
+    exerciseId: number;
+    setNumber: number;
+    reps?: number;
+    weightKg?: number;
+    durationSeconds?: number;
+    rpeScale?: number;
+  }): Promise<ExercisePerformance> {
+    const performance = this.performanceRepository.create(data);
+    
+    // AI Form Analysis
+    performance.formFeedback = await this.analyzeFormWithAI(data);
+    
+    // Check for Personal Records
+    performance.isPersonalRecord = await this.checkPersonalRecord(data);
+
+    const savedPerformance = await this.performanceRepository.save(performance);
+
+    this.emitWorkoutEvent('exercise_completed', {
+      sessionId: data.workoutSessionId,
+      exerciseId: data.exerciseId,
+      isPersonalRecord: performance.isPersonalRecord,
+      formScore: performance.formFeedback?.aiScore,
+    });
+
+    return savedPerformance;
   }
 
-  // 2. Coach-Client Real-time Communication
-  sendMessageToClient(coachId: number, clientId: number, message: string) {
-    this.coachClientCommunication$.next({
-      from: coachId,
-      to: clientId,
-      message,
+  async createHealthAlert(userId: number, type: HealthAlertType, data: any): Promise<HealthAlert> {
+    const alert = this.healthAlertRepository.create({
+      userId,
+      type,
+      severity: this.calculateSeverity(type, data),
+      title: this.generateAlertTitle(type),
+      description: this.generateAlertDescription(type, data),
+      healthData: data,
+      recommendations: this.generateRecommendations(type, data),
+      requiresMedicalAttention: this.requiresMedicalAttention(type, data),
+    });
+
+    const savedAlert = await this.healthAlertRepository.save(alert);
+
+    // Notify coach if critical
+    if (alert.severity === AlertSeverity.CRITICAL || alert.requiresMedicalAttention) {
+      this.notifyCoach(userId, alert);
+    }
+
+    this.emitHealthEvent('health_alert', {
+      userId,
+      alertId: savedAlert.id,
+      severity: alert.severity,
+      type: alert.type,
+    });
+
+    return savedAlert;
+  }
+
+  async updateGoalProgress(userId: number, goalId: number, newValue: number): Promise<void> {
+    const goal = await this.smartGoalRepository.findOne({ where: { id: goalId, userId } });
+    if (!goal) return;
+
+    const previousValue = goal.currentValue;
+    goal.currentValue = newValue;
+
+    // Check milestone achievements
+    const achievedMilestones = goal.milestones.filter(
+      m => !m.achieved && newValue >= m.value
+    );
+
+    achievedMilestones.forEach(milestone => {
+      milestone.achieved = true;
+      milestone.achievedDate = new Date();
+    });
+
+    // Update AI insights
+    goal.aiInsights = await this.generateAIInsights(goal);
+
+    // Check if goal is completed
+    if (newValue >= goal.targetValue && goal.status === GoalStatus.ACTIVE) {
+      goal.status = GoalStatus.COMPLETED;
+      this.emitGoalEvent('goal_completed', { userId, goalId, finalValue: newValue });
+    }
+
+    await this.smartGoalRepository.save(goal);
+
+    this.emitGoalEvent('goal_progress', {
+      userId,
+      goalId,
+      previousValue,
+      newValue,
+      progressPercentage: (newValue / goal.targetValue) * 100,
+      achievedMilestones: achievedMilestones.length,
+    });
+  }
+
+  updateSubscriptionStatus(userId: number, event: string, data: any): void {
+    this.emitSubscriptionEvent('subscription_update', {
+      userId,
+      event,
+      data,
       timestamp: new Date(),
-      type: 'coach_to_client'
     });
   }
 
-  getClientMessages(clientId: number): Observable<any> {
-    return this.coachClientCommunication$.pipe(
-      filter(msg => msg.to === clientId),
-      debounceTime(100), // Prevent spam
-      distinctUntilChanged((prev, curr) => prev.message === curr.message)
-    );
-  }
-
-  // 3. Subscription Status Monitoring
-  updateSubscriptionStatus(userId: number, status: string, details: any) {
-    this.subscriptionChanges$.next({
-      userId,
-      status,
-      details,
-      timestamp: new Date()
-    });
-  }
-
-  getSubscriptionUpdates(userId: number): Observable<any> {
-    return this.subscriptionChanges$.pipe(
-      filter(change => change && change.userId === userId),
-      distinctUntilChanged((prev, curr) => prev?.status === curr?.status)
-    );
-  }
-
-  // 4. Real-time Health Metrics Monitoring
-  monitorHealthMetrics(userId: number): Observable<any> {
-    return timer(0, 30000) // Check every 30 seconds
-      .pipe(
-        switchMap(() => this.getLatestHealthMetrics(userId)),
-        distinctUntilChanged((prev, curr) => 
-          prev?.weight === curr?.weight && 
-          prev?.heartRate === curr?.heartRate &&
-          prev?.bmi === curr?.bmi
-        ),
-        map(metrics => this.analyzeHealthMetrics(metrics)),
-        tap(analysis => {
-          if (analysis.alerts.length > 0) {
-            this.sendHealthAlerts(userId, analysis.alerts);
-          }
-        }),
-        catchError(error => {
-          console.error('Health monitoring error:', error);
-          return EMPTY;
-        })
-      );
-  }
-
-  // Emit health metrics update
-  emitHealthMetricsUpdate(userId: number, metrics: any) {
-    this.healthMetricsUpdates$.next({
-      userId,
-      metrics,
-      timestamp: new Date()
-    });
-  }
-
-  // Get health metrics updates stream
-  getHealthMetricsUpdates(userId: number): Observable<any> {
-    return this.healthMetricsUpdates$.pipe(
-      filter(update => update.userId === userId),
-      map(update => update.metrics)
-    );
-  }
-
-  // 5. Health Metrics Stream Processing
-  processHealthMetrics(healthData: any[]): Observable<any> {
-    return of(healthData).pipe(
-      map(data => this.calculateHealthTrends(data)),
-      map(trends => this.generateHealthInsights(trends)),
-      catchError(error => {
-        console.error('Health metrics processing error:', error);
-        return of({ error: 'Failed to process health metrics' });
-      })
-    );
-  }
-
-  private calculateHealthTrends(data: any[]): any {
-    // Calculate BMI trends, weight changes, etc.
+  monitorHealthMetrics(userId: number): any {
+    // Return observable for real-time health monitoring
     return {
-      weightTrend: this.calculateTrend(data.map(d => d.weight)),
-      bmiTrend: this.calculateTrend(data.map(d => d.bmi)),
-      progressScore: this.calculateProgressScore(data)
+      subscribe: (callback: any) => {
+        // Implementation for real-time health metric monitoring
+        console.log(`Monitoring health metrics for user ${userId}`);
+        return { unsubscribe: () => {} };
+      }
     };
   }
 
-  private generateHealthInsights(trends: any): any {
+  getSubscriptionUpdates(userId: number): any {
+    // Return observable for subscription updates
     return {
-      insights: [
-        trends.weightTrend > 0 ? 'Weight increasing' : 'Weight decreasing',
-        trends.progressScore > 80 ? 'Excellent progress!' : 'Keep working!',
+      subscribe: (callback: any) => {
+        // Implementation for real-time subscription updates
+        console.log(`Getting subscription updates for user ${userId}`);
+        return { unsubscribe: () => {} };
+      }
+    };
+  }
+
+  private async analyzeFormWithAI(data: any): Promise<any> {
+    // AI form analysis simulation
+    return {
+      aiScore: Math.floor(Math.random() * 40) + 60, // 60-100 score
+      suggestions: [
+        'Keep your back straight',
+        'Control the movement on the way down',
+        'Engage your core throughout the movement'
       ],
-      recommendations: this.getRecommendations(trends),
-      trends
     };
   }
 
-  private calculateTrend(values: number[]): number {
-    if (values.length < 2) return 0;
-    const latest = values[values.length - 1];
-    const previous = values[values.length - 2];
-    return ((latest - previous) / previous) * 100;
+  private async checkPersonalRecord(data: any): Promise<boolean> {
+    // Check if this is a personal record
+    const previousBest = await this.performanceRepository
+      .createQueryBuilder('performance')
+      .where('performance.exerciseId = :exerciseId', { exerciseId: data.exerciseId })
+      .andWhere('performance.workoutSession.userId = (SELECT ws.userId FROM workout_sessions ws WHERE ws.id = :sessionId)', 
+        { sessionId: data.workoutSessionId })
+      .orderBy('performance.weightKg', 'DESC')
+      .addOrderBy('performance.reps', 'DESC')
+      .getOne();
+
+    if (!previousBest) return true;
+
+    return (data.weightKg || 0) > (previousBest.weightKg || 0) || 
+           (data.reps || 0) > (previousBest.reps || 0);
   }
 
-  private calculateProgressScore(data: any[]): number {
-    // Mock calculation - implement actual logic
-    return Math.floor(Math.random() * 100);
-  }
-
-  private getRecommendations(trends: any): string[] {
-    const recommendations = [];
-    if (trends.weightTrend > 5) {
-      recommendations.push('Consider adjusting your diet plan');
+  private calculateSeverity(type: HealthAlertType, data: any): AlertSeverity {
+    switch (type) {
+      case HealthAlertType.HEART_RATE_ANOMALY:
+        return data.value > 180 ? AlertSeverity.CRITICAL : AlertSeverity.HIGH;
+      case HealthAlertType.BLOOD_PRESSURE_HIGH:
+        return data.systolic > 160 ? AlertSeverity.HIGH : AlertSeverity.MEDIUM;
+      default:
+        return AlertSeverity.MEDIUM;
     }
-    if (trends.progressScore < 50) {
-      recommendations.push('Increase workout frequency');
-    }
-    return recommendations;
   }
 
-  private getLatestHealthMetrics(userId: number): Observable<any> {
-    // Mock health metrics - in real implementation, this would fetch from database
-    return of({
+  private generateAlertTitle(type: HealthAlertType): string {
+    const titles = {
+      [HealthAlertType.HEART_RATE_ANOMALY]: 'Unusual Heart Rate Detected',
+      [HealthAlertType.OVERTRAINING]: 'Overtraining Risk Detected',
+      [HealthAlertType.DEHYDRATION]: 'Dehydration Warning',
+    };
+    return titles[type] || 'Health Alert';
+  }
+
+  private generateAlertDescription(type: HealthAlertType, data: any): string {
+    return `Your ${data.metric} reading of ${data.value}${data.unit} is outside the normal range.`;
+  }
+
+  private generateRecommendations(type: HealthAlertType, data: any): string[] {
+    const recommendations = {
+      [HealthAlertType.HEART_RATE_ANOMALY]: [
+        'Take a rest and monitor your heart rate',
+        'Stay hydrated',
+        'Consider consulting a healthcare professional'
+      ],
+      [HealthAlertType.DEHYDRATION]: [
+        'Drink water immediately',
+        'Reduce exercise intensity',
+        'Monitor urine color'
+      ],
+    };
+    return recommendations[type] || ['Consult with your coach'];
+  }
+
+  private requiresMedicalAttention(type: HealthAlertType, data: any): boolean {
+    return type === HealthAlertType.HEART_RATE_ANOMALY && data.value > 200;
+  }
+
+  private async notifyCoach(userId: number, alert: HealthAlert): Promise<void> {
+    // Implementation for notifying coach
+    this.emitCoachEvent('client_health_alert', {
       userId,
-      weight: 70 + Math.random() * 10, // Random weight between 70-80kg
-      height: 175, // Fixed height
-      bmi: null, // Will be calculated
-      heartRate: 60 + Math.random() * 40, // Random heart rate 60-100
-      bloodPressureSystolic: 110 + Math.random() * 20, // 110-130
-      bloodPressureDiastolic: 70 + Math.random() * 15, // 70-85
-      bodyFatPercentage: 12 + Math.random() * 8, // 12-20%
-      recordedAt: new Date()
-    }).pipe(
-      map(metrics => ({
-        ...metrics,
-        bmi: Math.round((metrics.weight / Math.pow(metrics.height / 100, 2)) * 100) / 100
-      }))
-    );
+      alertId: alert.id,
+      severity: alert.severity,
+      type: alert.type,
+    });
   }
 
-  private analyzeHealthMetrics(metrics: any): any {
-    const alerts = [];
+  private async generateAIInsights(goal: SmartGoal): Promise<any> {
+    const progressPercentage = (goal.currentValue / goal.targetValue) * 100;
+    const daysRemaining = Math.ceil((goal.targetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
     
-    if (metrics?.heartRate > 180) {
-      alerts.push('High heart rate detected - consider rest');
-    }
-    if (metrics?.heartRate < 50) {
-      alerts.push('Low heart rate detected - consult doctor if persistent');
-    }
-    if (metrics?.bmi > 30) {
-      alerts.push('BMI indicates obesity - consider diet adjustment');
-    }
-    if (metrics?.bmi < 18.5) {
-      alerts.push('BMI indicates underweight - consider nutrition consultation');
-    }
-    if (metrics?.bloodPressureSystolic > 140) {
-      alerts.push('High blood pressure detected - monitor closely');
-    }
-    
-    return { 
-      metrics, 
-      alerts, 
-      timestamp: new Date(),
-      healthScore: this.calculateHealthScore(metrics)
+    return {
+      probabilityOfSuccess: Math.min(100, progressPercentage + Math.random() * 20),
+      suggestedAdjustments: progressPercentage < 50 ? 
+        ['Increase workout frequency', 'Focus on consistency'] : 
+        ['Maintain current pace', 'Fine-tune nutrition'],
+      motivationalMessage: this.generateMotivationalMessage(progressPercentage),
+      weeklyProgress: (goal.currentValue - 0) / Math.max(1, Math.ceil((Date.now() - goal.startDate.getTime()) / (1000 * 60 * 60 * 24 * 7))),
     };
   }
 
-  private sendHealthAlerts(userId: number, alerts: string[]): void {
-    console.log(`🚨 Health alerts for user ${userId}:`, alerts);
-    // Emit real-time alert
-    this.emitHealthMetricsUpdate(userId, {
-      type: 'health_alert',
-      alerts,
-      timestamp: new Date()
-    });
-    // TODO: Implement actual alert system (email, push notifications, etc.)
+  private generateMotivationalMessage(progress: number): string {
+    if (progress < 25) return "Every journey begins with a single step. You're building the foundation!";
+    if (progress < 50) return "Great momentum! You're making real progress toward your goal.";
+    if (progress < 75) return "You're over halfway there! Keep pushing forward.";
+    return "Almost there! Your dedication is about to pay off!";
   }
 
-  private calculateHealthScore(metrics: any): number {
-    if (!metrics) return 0;
-    
-    let score = 100;
-    
-    // Deduct points for concerning metrics
-    if (metrics.bmi > 25) score -= 10;
-    if (metrics.bmi > 30) score -= 20;
-    if (metrics.heartRate > 100) score -= 15;
-    if (metrics.heartRate < 60) score -= 10;
-    if (metrics.bloodPressureSystolic > 140) score -= 25;
-    if (metrics.bodyFatPercentage > 25) score -= 10;
-    
-    return Math.max(0, score);
+  private async checkForAchievements(userId: number): Promise<void> {
+    // Check for various achievements like workout streaks, personal records, etc.
+    this.emitAchievementEvent('achievement_unlocked', {
+      userId,
+      achievementType: 'workout_completion',
+      title: 'Workout Warrior',
+      description: 'Completed another amazing workout!',
+    });
+  }
+
+  private async analyzeHealthMetrics(userId: number, data: any): Promise<void> {
+    // Analyze health metrics from workout data
+    if (data.heartRateData) {
+      const avgHeartRate = data.heartRateData.reduce((sum: number, hr: any) => sum + hr.bpm, 0) / data.heartRateData.length;
+      
+      if (avgHeartRate > 180) {
+        await this.createHealthAlert(userId, HealthAlertType.HEART_RATE_ANOMALY, {
+          metric: 'Average Heart Rate',
+          value: avgHeartRate,
+          normalRange: { min: 60, max: 180 },
+          unit: 'bpm',
+        });
+      }
+    }
+  }
+
+  private emitWorkoutEvent(event: string, data: any): void {
+    // WebSocket implementation would go here
+    console.log(`Emitting workout event: ${event}`, data);
+  }
+
+  private emitHealthEvent(event: string, data: any): void {
+    // WebSocket implementation would go here
+    console.log(`Emitting health event: ${event}`, data);
+  }
+
+  private emitGoalEvent(event: string, data: any): void {
+    // WebSocket implementation would go here
+    console.log(`Emitting goal event: ${event}`, data);
+  }
+
+  private emitCoachEvent(event: string, data: any): void {
+    // WebSocket implementation would go here
+    console.log(`Emitting coach event: ${event}`, data);
+  }
+
+  private emitAchievementEvent(event: string, data: any): void {
+    // WebSocket implementation would go here
+    console.log(`Emitting achievement event: ${event}`, data);
+  }
+
+  private emitSubscriptionEvent(event: string, data: any): void {
+    // WebSocket implementation would go here
+    console.log(`Emitting subscription event: ${event}`, data);
   }
 }

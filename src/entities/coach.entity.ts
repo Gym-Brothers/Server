@@ -6,6 +6,7 @@ import { Subscription } from './subscription.entity';
 import { TrainingProgram } from './training-program.entity';
 import { NutritionPlan } from './nutrition-plan.entity';
 import { Media } from './media.entity';
+import { CoachingMessage } from './coaching-message.entity';
 
 @Entity('coaches')
 export class Coach {
@@ -76,4 +77,7 @@ export class Coach {
 
   @OneToMany(() => Media, media => media.coach)
   media: Media[];
+
+  @OneToMany(() => CoachingMessage, message => message.coach)
+  coachingMessages: CoachingMessage[];
 }

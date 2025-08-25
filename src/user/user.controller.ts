@@ -2,7 +2,7 @@ import { Controller, Get, Put, Body, Delete, Sse } from '@nestjs/common';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { UserService } from './user.service';
 import { UpdateUserDto } from '../dto/user/user.dto';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 @Controller('user')
@@ -33,16 +33,15 @@ export class UserController {
 
   // NEW: Server-Sent Events endpoint for real-time dashboard updates
   @Sse('dashboard/stream')
-  getDashboardStream(@CurrentUser() user: any): Observable<any> {
-    return this.userService.getUserDashboardReactive(user.id).pipe(
-      map(data => ({
-        data: JSON.stringify({
-          type: 'dashboard_update',
-          payload: data,
-          timestamp: new Date().toISOString()
-        })
-      }))
-    );
+  async getDashboardStream(@CurrentUser() user: any): Promise<Observable<any>> {
+    const dashboardData = await this.userService.getUserDashboardReactive(user.id);
+    return of({
+      data: JSON.stringify({
+        type: 'dashboard_update',
+        payload: dashboardData,
+        timestamp: new Date().toISOString()
+      })
+    });
   }
 
   // NEW: Real-time subscription status updates
@@ -76,7 +75,7 @@ export class UserController {
   // Enhanced dashboard with reactive data loading
   @Get('dashboard')
   async getDashboard(@CurrentUser() user: any) {
-    const dashboardData = await this.userService.getUserDashboardReactive(user.id).toPromise();
+    const dashboardData = await this.userService.getUserDashboardReactive(user.id);
     return {
       message: `Welcome to your dashboard, ${user.username}!`,
       data: dashboardData,

@@ -38,21 +38,22 @@ export class UserService {
   }
 
   // Enhanced dashboard with RxJS reactive data loading
-  getUserDashboardReactive(userId: number): Observable<any> {
-    return this.asyncOperationsService.getUserDashboardData(userId).pipe(
-      tap(dashboardData => {
-        // Emit real-time update for this user's dashboard
-        this.realtimeService.updateSubscriptionStatus(
-          userId, 
-          'dashboard_loaded', 
-          { timestamp: new Date() }
-        );
-      }),
-      catchError(error => {
-        console.error('Dashboard loading error:', error);
-        return of({ error: 'Failed to load dashboard data' });
-      })
-    );
+  async getUserDashboardReactive(userId: number): Promise<any> {
+    try {
+      const dashboardData = await this.asyncOperationsService.getUserDashboardData(userId);
+      
+      // Emit real-time update for this user's dashboard
+      this.realtimeService.updateSubscriptionStatus(
+        userId, 
+        'dashboard_loaded', 
+        { timestamp: new Date() }
+      );
+      
+      return dashboardData;
+    } catch (error) {
+      console.error('Error getting dashboard data:', error);
+      throw error;
+    }
   }
 
   // Real-time user profile updates

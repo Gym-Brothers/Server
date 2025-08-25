@@ -3,6 +3,7 @@ import { Coach } from './coach.entity';
 import { User } from './user.entity';
 import { TrainingDay } from './training-day.entity';
 import { Media } from './media.entity';
+import { WorkoutSession } from './workout-session.entity';
 
 export enum ProgramDifficulty {
   BEGINNER = 'beginner',
@@ -105,4 +106,7 @@ export class TrainingProgram {
 
   @OneToMany(() => Media, media => media.trainingProgram)
   media: Media[];
+
+  @OneToMany(() => WorkoutSession, session => session.trainingProgram)
+  workoutSessions: WorkoutSession[];
 }

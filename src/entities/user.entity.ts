@@ -10,6 +10,11 @@ import { Subscription } from './subscription.entity';
 import { InBodyTest } from './inbody-test.entity';
 import { TrainingProgram } from './training-program.entity';
 import { NutritionPlan } from './nutrition-plan.entity';
+import { WorkoutSession } from './workout-session.entity';
+import { HealthAlert } from './health-alert.entity';
+import { SmartGoal } from './smart-goal.entity';
+import { WearableIntegration } from './wearable-integration.entity';
+import { CoachingMessage } from './coaching-message.entity';
 
 @Entity('users')
 export class User {
@@ -104,4 +109,22 @@ export class User {
 
   @OneToMany(() => NutritionPlan, plan => plan.user)
   nutritionPlans: NutritionPlan[];
+
+  @OneToMany(() => WorkoutSession, session => session.user)
+  workoutSessions: WorkoutSession[];
+
+  @OneToMany(() => HealthAlert, alert => alert.user)
+  healthAlerts: HealthAlert[];
+
+  @OneToMany(() => SmartGoal, goal => goal.user)
+  smartGoals: SmartGoal[];
+
+  @OneToMany(() => WearableIntegration, wearable => wearable.user)
+  wearableIntegrations: WearableIntegration[];
+
+  @OneToMany(() => CoachingMessage, message => message.sender)
+  sentMessages: CoachingMessage[];
+
+  @OneToMany(() => CoachingMessage, message => message.receiver)
+  receivedMessages: CoachingMessage[];
 }

@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { TrainingDay } from './training-day.entity';
 import { Media } from './media.entity';
+import { ExercisePerformance } from './exercise-performance.entity';
 
 export enum ExerciseType {
   STRENGTH = 'strength',
@@ -82,4 +83,7 @@ export class Exercise {
 
   @OneToMany(() => Media, media => media.exercise)
   media: Media[];
+
+  @OneToMany(() => ExercisePerformance, performance => performance.exercise)
+  performances: ExercisePerformance[];
 }

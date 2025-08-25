@@ -36,6 +36,12 @@ import { NutritionPlan } from './entities/nutrition-plan.entity';
 import { NutritionDay } from './entities/nutrition-day.entity';
 import { Meal } from './entities/meal.entity';
 import { FoodItem } from './entities/food-item.entity';
+import { WorkoutSession } from './entities/workout-session.entity';
+import { ExercisePerformance } from './entities/exercise-performance.entity';
+import { CoachingMessage } from './entities/coaching-message.entity';
+import { HealthAlert } from './entities/health-alert.entity';
+import { SmartGoal } from './entities/smart-goal.entity';
+import { WearableIntegration } from './entities/wearable-integration.entity';
 
 @Module({
   imports: [
@@ -72,6 +78,12 @@ import { FoodItem } from './entities/food-item.entity';
           NutritionDay,
           Meal,
           FoodItem,
+          WorkoutSession,
+          ExercisePerformance,
+          CoachingMessage,
+          HealthAlert,
+          SmartGoal,
+          WearableIntegration,
         ],
         synchronize: configService.get('NODE_ENV') !== 'production',
         logging: configService.get('NODE_ENV') === 'development',
