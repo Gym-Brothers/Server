@@ -7,6 +7,9 @@ import { MedicalHistory } from './medical-history.entity';
 import { FitnessGoals } from './fitness-goals.entity';
 import { Coach } from './coach.entity';
 import { Subscription } from './subscription.entity';
+import { InBodyTest } from './inbody-test.entity';
+import { TrainingProgram } from './training-program.entity';
+import { NutritionPlan } from './nutrition-plan.entity';
 
 @Entity('users')
 export class User {
@@ -92,4 +95,13 @@ export class User {
 
   @OneToMany(() => Subscription, subscription => subscription.user)
   subscriptions: Subscription[];
+
+  @OneToMany(() => InBodyTest, test => test.user)
+  inBodyTests: InBodyTest[];
+
+  @OneToMany(() => TrainingProgram, program => program.assignedUser)
+  trainingPrograms: TrainingProgram[];
+
+  @OneToMany(() => NutritionPlan, plan => plan.user)
+  nutritionPlans: NutritionPlan[];
 }

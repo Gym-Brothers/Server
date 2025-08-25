@@ -3,6 +3,9 @@ import { User } from './user.entity';
 import { CoachCertification } from './coach-certification.entity';
 import { CoachSpecialization } from './coach-specialization.entity';
 import { Subscription } from './subscription.entity';
+import { TrainingProgram } from './training-program.entity';
+import { NutritionPlan } from './nutrition-plan.entity';
+import { Media } from './media.entity';
 
 @Entity('coaches')
 export class Coach {
@@ -64,4 +67,13 @@ export class Coach {
 
   @OneToMany(() => Subscription, subscription => subscription.coach)
   subscriptions: Subscription[];
+
+  @OneToMany(() => TrainingProgram, program => program.coach)
+  trainingPrograms: TrainingProgram[];
+
+  @OneToMany(() => NutritionPlan, plan => plan.coach)
+  nutritionPlans: NutritionPlan[];
+
+  @OneToMany(() => Media, media => media.coach)
+  media: Media[];
 }

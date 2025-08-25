@@ -9,6 +9,11 @@ import { UserModule } from './user/user.module';
 import { HealthModule } from './health/health.module';
 import { CoachModule } from './coach/coach.module';
 import { SubscriptionModule } from './subscription/subscription.module';
+import { MediaModule } from './media/media.module';
+import { InBodyModule } from './inbody/inbody.module';
+import { NutritionModule } from './nutrition/nutrition.module';
+import { TrainingProgramModule } from './training-program/training-program.module';
+import { SearchModule } from './search/search.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 // Import all entities
@@ -22,6 +27,15 @@ import { Coach } from './entities/coach.entity';
 import { CoachCertification } from './entities/coach-certification.entity';
 import { CoachSpecialization } from './entities/coach-specialization.entity';
 import { Subscription } from './entities/subscription.entity';
+import { InBodyTest } from './entities/inbody-test.entity';
+import { TrainingProgram } from './entities/training-program.entity';
+import { TrainingDay } from './entities/training-day.entity';
+import { Exercise } from './entities/exercise.entity';
+import { Media } from './entities/media.entity';
+import { NutritionPlan } from './entities/nutrition-plan.entity';
+import { NutritionDay } from './entities/nutrition-day.entity';
+import { Meal } from './entities/meal.entity';
+import { FoodItem } from './entities/food-item.entity';
 
 @Module({
   imports: [
@@ -49,19 +63,31 @@ import { Subscription } from './entities/subscription.entity';
           CoachCertification,
           CoachSpecialization,
           Subscription,
+          InBodyTest,
+          TrainingProgram,
+          TrainingDay,
+          Exercise,
+          Media,
+          NutritionPlan,
+          NutritionDay,
+          Meal,
+          FoodItem,
         ],
-        synchronize: configService.get('DB_SYNCHRONIZE') === 'true',
-        logging: configService.get('DB_LOGGING') === 'true',
-        migrations: ['dist/migrations/*.js'],
-        migrationsRun: true,
+        synchronize: configService.get('NODE_ENV') !== 'production',
+        logging: configService.get('NODE_ENV') === 'development',
       }),
       inject: [ConfigService],
     }),
-    AuthModule, 
+    AuthModule,
     UserModule,
     HealthModule,
     CoachModule,
     SubscriptionModule,
+    MediaModule,
+    InBodyModule,
+    NutritionModule,
+    TrainingProgramModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [

@@ -21,7 +21,12 @@
     "esModuleInterop": true,
     "types": [
       "node",
-      "jest"
+      "jest",
+      "multer"
+    ],
+    "typeRoots": [
+      "node_modules/@types",
+      "src/types"
     ]
   },
   "include": [
