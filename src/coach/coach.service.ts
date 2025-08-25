@@ -6,7 +6,16 @@ import { CoachCertification } from '../entities/coach-certification.entity';
 import { CoachSpecialization } from '../entities/coach-specialization.entity';
 import { User } from '../entities/user.entity';
 import { Subscription } from '../entities/subscription.entity';
-import { CreateCoachDto, UpdateCoachProfileDto, CreateCertificationDto } from '../dto/coach/coach.dto';
+import { 
+  CreateCoachDto, 
+  UpdateCoachProfileDto, 
+  CreateCertificationDto,
+  CoachSpecializationDto,
+  AddSpecializationDto,
+  UpdateSpecializationDto,
+  CoachReviewDto 
+} from '../dto/coach/coach.dto';
+import { SubscriptionStatus } from '../models/enums';
 
 @Injectable()
 export class CoachService {
@@ -105,22 +114,25 @@ export class CoachService {
       throw new BadRequestException('User already has a coach profile');
     }
 
+    // Create coach without specializations first
+    const { specializations, ...coachData } = coachDto;
+    
     const coach = this.coachRepository.create({
       userId,
-      ...coachDto,
+      ...coachData,
     });
 
     const savedCoach = await this.coachRepository.save(coach);
 
-    // Add specializations
-    if (coachDto.specializations && coachDto.specializations.length > 0) {
-      const specializations = coachDto.specializations.map(name => 
+    // Add specializations separately
+    if (specializations && specializations.length > 0) {
+      const specializationEntities = specializations.map(name => 
         this.specializationRepository.create({
           coachId: savedCoach.id,
           name,
         })
       );
-      await this.specializationRepository.save(specializations);
+      await this.specializationRepository.save(specializationEntities);
     }
 
     return savedCoach;
@@ -156,7 +168,7 @@ export class CoachService {
     const subscriptions = await this.subscriptionRepository.find({
       where: { 
         coachId,
-        status: 'active'
+        status: SubscriptionStatus.ACTIVE
       },
       relations: ['user'],
       order: { createdAt: 'DESC' },
@@ -182,7 +194,7 @@ export class CoachService {
       where: {
         coachId,
         userId: clientId,
-        status: 'active',
+        status: SubscriptionStatus.ACTIVE,
       },
     });
 
@@ -283,6 +295,91 @@ export class CoachService {
         }
       }
     };
+  }
+
+  async addSpecialization(coachId: number, specializationDto: AddSpecializationDto): Promise<CoachSpecialization> {
+    const coach = await this.coachRepository.findOne({ where: { id: coachId } });
+    if (!coach) {
+      throw new NotFoundException('Coach not found');
+    }
+
+    // Check if specialization already exists for this coach
+    const existingSpecialization = await this.specializationRepository.findOne({
+      where: { coachId, name: specializationDto.name }
+    });
+
+    if (existingSpecialization) {
+      throw new BadRequestException('Specialization already exists for this coach');
+    }
+
+    const specialization = this.specializationRepository.create({
+      coachId,
+      ...specializationDto,
+    });
+
+    return this.specializationRepository.save(specialization);
+  }
+
+  async updateSpecialization(
+    coachId: number, 
+    specializationId: number, 
+    updateDto: UpdateSpecializationDto
+  ): Promise<CoachSpecialization> {
+    const specialization = await this.specializationRepository.findOne({
+      where: { id: specializationId, coachId }
+    });
+
+    if (!specialization) {
+      throw new NotFoundException('Specialization not found for this coach');
+    }
+
+    Object.assign(specialization, updateDto);
+    return this.specializationRepository.save(specialization);
+  }
+
+  async removeSpecialization(coachId: number, specializationId: number): Promise<{ message: string }> {
+    const specialization = await this.specializationRepository.findOne({
+      where: { id: specializationId, coachId }
+    });
+
+    if (!specialization) {
+      throw new NotFoundException('Specialization not found for this coach');
+    }
+
+    await this.specializationRepository.remove(specialization);
+    return { message: 'Specialization removed successfully' };
+  }
+
+  async getCoachSpecializations(coachId: number): Promise<CoachSpecializationDto[]> {
+    const specializations = await this.specializationRepository.find({
+      where: { coachId }
+    });
+
+    return specializations.map(spec => ({
+      name: spec.name,
+      description: spec.description || undefined
+    }));
+  }
+
+  // TODO: Implement proper review system when Review entity is created
+  async addReview(coachId: number, reviewDto: CoachReviewDto): Promise<{ message: string }> {
+    // For now, this is a placeholder that updates coach's average rating
+    const coach = await this.coachRepository.findOne({ where: { id: coachId } });
+    if (!coach) {
+      throw new NotFoundException('Coach not found');
+    }
+
+    // TODO: Replace with actual review entity creation
+    // This is a simplified version that just updates the coach's rating
+    const newTotalReviews = coach.totalReviews + 1;
+    const newAverageRating = ((coach.averageRating * coach.totalReviews) + reviewDto.rating) / newTotalReviews;
+
+    coach.totalReviews = newTotalReviews;
+    coach.averageRating = Math.round(newAverageRating * 100) / 100; // Round to 2 decimal places
+
+    await this.coachRepository.save(coach);
+
+    return { message: 'Review added successfully' };
   }
 
   private calculateAge(dateOfBirth: Date): number {

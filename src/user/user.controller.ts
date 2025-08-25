@@ -1,26 +1,29 @@
-import { Controller, Get, Put, Body, Delete } from '@nestjs/common';
+import { Controller, Get, Put, Body, Delete, Sse } from '@nestjs/common';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { UserService } from './user.service';
 import { UpdateUserDto } from '../dto/user/user.dto';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  // This endpoint requires authentication (no @Public decorator)
+  // Original endpoints converted to reactive patterns
   @Get('profile')
   async getProfile(@CurrentUser() user: any) {
-    const userProfile = await this.userService.getUserProfile(user.id);
+    // Convert Observable to Promise for HTTP response
+    const userProfile = await this.userService.findUserById(user.id).toPromise();
     return {
       message: 'User profile retrieved successfully',
       user: userProfile,
     };
   }
 
-  // This endpoint requires authentication
   @Put('profile')
   async updateProfile(@CurrentUser() user: any, @Body() updateData: UpdateUserDto) {
-    const updatedUser = await this.userService.updateUserProfile(user.id, updateData);
+    // Use reactive update method
+    const updatedUser = await this.userService.updateUserProfileReactive(user.id, updateData).toPromise();
     const { password, ...userWithoutPassword } = updatedUser;
     return {
       message: 'Profile updated successfully',
@@ -28,10 +31,52 @@ export class UserController {
     };
   }
 
-  // This endpoint requires authentication
+  // NEW: Server-Sent Events endpoint for real-time dashboard updates
+  @Sse('dashboard/stream')
+  getDashboardStream(@CurrentUser() user: any): Observable<any> {
+    return this.userService.getUserDashboardReactive(user.id).pipe(
+      map(data => ({
+        data: JSON.stringify({
+          type: 'dashboard_update',
+          payload: data,
+          timestamp: new Date().toISOString()
+        })
+      }))
+    );
+  }
+
+  // NEW: Real-time subscription status updates
+  @Sse('subscriptions/stream')
+  getSubscriptionUpdatesStream(@CurrentUser() user: any): Observable<any> {
+    return this.userService.getSubscriptionUpdatesStream(user.id).pipe(
+      map(update => ({
+        data: JSON.stringify({
+          type: 'subscription_update',
+          payload: update,
+          timestamp: new Date().toISOString()
+        })
+      }))
+    );
+  }
+
+  // NEW: Real-time health metrics monitoring
+  @Sse('health/stream')
+  getHealthMetricsStream(@CurrentUser() user: any): Observable<any> {
+    return this.userService.getHealthMetricsStream(user.id).pipe(
+      map(metrics => ({
+        data: JSON.stringify({
+          type: 'health_update',
+          payload: metrics,
+          timestamp: new Date().toISOString()
+        })
+      }))
+    );
+  }
+
+  // Enhanced dashboard with reactive data loading
   @Get('dashboard')
   async getDashboard(@CurrentUser() user: any) {
-    const dashboardData = await this.userService.getUserDashboard(user.id);
+    const dashboardData = await this.userService.getUserDashboardReactive(user.id).toPromise();
     return {
       message: `Welcome to your dashboard, ${user.username}!`,
       data: dashboardData,

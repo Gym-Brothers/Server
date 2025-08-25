@@ -3,6 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { UpdateUserDto } from '../dto/user/user.dto';
+import { Observable, from, of } from 'rxjs';
+import { map, switchMap, catchError, tap } from 'rxjs/operators';
+import { RealtimeService } from '../services/realtime.service';
+import { AsyncOperationsService } from '../services/async-operations.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -10,138 +14,114 @@ export class UserService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private realtimeService: RealtimeService,
+    private asyncOperationsService: AsyncOperationsService,
   ) {}
 
-  async findUserById(id: number): Promise<User> {
-    const user = await this.userRepository.findOne({
+  // Convert existing method to return Observable for reactive patterns
+  findUserById(id: number): Observable<User> {
+    return from(this.userRepository.findOne({
       where: { id },
-      relations: [
-        'addresses', 
-        'emergencyContacts', 
-        'healthMetrics', 
-        'medicalHistory', 
-        'fitnessGoals',
-        'subscriptions',
-        'subscriptions.coach',
-        'subscriptions.coach.user'
-      ]
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return user;
+      relations: ['addresses', 'emergencyContacts', 'subscriptions']
+    })).pipe(
+      map(user => {
+        if (!user) {
+          throw new NotFoundException('User not found');
+        }
+        return user;
+      }),
+      catchError(error => {
+        console.error('Error finding user:', error);
+        throw error;
+      })
+    );
   }
 
-  async getUserProfile(userId: number): Promise<any> {
-    const user = await this.findUserById(userId);
-    const { password, ...userWithoutPassword } = user;
-    
-    return {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      dateOfBirth: user.dateOfBirth,
-      gender: user.gender,
-      phoneNumber: user.phoneNumber,
-      profilePicture: user.profilePicture,
-      activityLevel: user.activityLevel,
-      addresses: user.addresses,
-      emergencyContacts: user.emergencyContacts,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
+  // Enhanced dashboard with RxJS reactive data loading
+  getUserDashboardReactive(userId: number): Observable<any> {
+    return this.asyncOperationsService.getUserDashboardData(userId).pipe(
+      tap(dashboardData => {
+        // Emit real-time update for this user's dashboard
+        this.realtimeService.updateSubscriptionStatus(
+          userId, 
+          'dashboard_loaded', 
+          { timestamp: new Date() }
+        );
+      }),
+      catchError(error => {
+        console.error('Dashboard loading error:', error);
+        return of({ error: 'Failed to load dashboard data' });
+      })
+    );
   }
 
-  async updateUserProfile(userId: number, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+  // Real-time user profile updates
+  updateUserProfileReactive(userId: number, updateUserDto: UpdateUserDto): Observable<User> {
+    return this.findUserById(userId).pipe(
+      switchMap(user => {
+        // Batch validation for username/email uniqueness
+        const validationPromises = [];
+        
+        if (updateUserDto.username && updateUserDto.username !== user.username) {
+          validationPromises.push(
+            this.userRepository.findOne({ where: { username: updateUserDto.username } })
+              .then(existingUser => {
+                if (existingUser) {
+                  throw new BadRequestException('Username already exists');
+                }
+              })
+          );
+        }
 
-    // Check if username or email is being updated and if they're already taken
-    if (updateUserDto.username && updateUserDto.username !== user.username) {
-      const existingUser = await this.userRepository.findOne({
-        where: { username: updateUserDto.username }
-      });
-      if (existingUser) {
-        throw new BadRequestException('Username already exists');
-      }
-    }
+        if (updateUserDto.email && updateUserDto.email !== user.email) {
+          validationPromises.push(
+            this.userRepository.findOne({ where: { email: updateUserDto.email } })
+              .then(existingUser => {
+                if (existingUser) {
+                  throw new BadRequestException('Email already exists');
+                }
+              })
+          );
+        }
 
-    if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existingUser = await this.userRepository.findOne({
-        where: { email: updateUserDto.email }
-      });
-      if (existingUser) {
-        throw new BadRequestException('Email already exists');
-      }
-    }
-
-    // Hash password if it's being updated
-    if (updateUserDto.password) {
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
-    }
-
-    Object.assign(user, updateUserDto);
-    return this.userRepository.save(user);
+        return from(Promise.all(validationPromises)).pipe(
+          switchMap(() => {
+            // Hash password if it's being updated
+            if (updateUserDto.password) {
+              return from(bcrypt.hash(updateUserDto.password, 10)).pipe(
+                map(hashedPassword => ({ ...updateUserDto, password: hashedPassword }))
+              );
+            }
+            return of(updateUserDto);
+          }),
+          switchMap(finalUpdateDto => {
+            Object.assign(user, finalUpdateDto);
+            return from(this.userRepository.save(user));
+          })
+        );
+      }),
+      tap(updatedUser => {
+        // Emit real-time profile update
+        this.realtimeService.updateSubscriptionStatus(
+          userId,
+          'profile_updated',
+          { 
+            updatedFields: Object.keys(updateUserDto),
+            timestamp: new Date()
+          }
+        );
+      })
+    );
   }
 
-  async getUserDashboard(userId: number): Promise<any> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: [
-        'subscriptions',
-        'healthMetrics',
-        'fitnessGoals',
-        'subscriptions.coach',
-        'subscriptions.coach.user'
-      ]
-    });
+  // Stream health metrics updates
+  getHealthMetricsStream(userId: number): Observable<any> {
+    return this.realtimeService.monitorHealthMetrics(userId);
+  }
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const activeSubscriptions = user.subscriptions?.filter(sub => sub.status === 'active') || [];
-    const latestHealthMetrics = user.healthMetrics?.sort((a, b) => 
-      new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
-    )[0];
-
-    return {
-      user: {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        profilePicture: user.profilePicture,
-      },
-      stats: {
-        activeSubscriptions: activeSubscriptions.length,
-        totalWorkouts: user.healthMetrics?.length || 0,
-        currentGoals: user.fitnessGoals?.length || 0,
-        memberSince: user.createdAt,
-      },
-      latestMetrics: latestHealthMetrics ? {
-        weight: latestHealthMetrics.weight,
-        height: latestHealthMetrics.height,
-        bmi: latestHealthMetrics.bmi,
-        bodyFatPercentage: latestHealthMetrics.bodyFatPercentage,
-        recordedAt: latestHealthMetrics.recordedAt,
-      } : null,
-      activeCoaches: activeSubscriptions.map(sub => ({
-        id: sub.coach.id,
-        name: `${sub.coach.user.firstName} ${sub.coach.user.lastName}`,
-        specializations: sub.coach.specializations?.map(s => s.name) || [],
-        subscriptionType: sub.type,
-      })),
-      recentActivity: {
-        lastLogin: new Date().toISOString(),
-        weeklyGoalProgress: '75%', // This could be calculated based on actual data
-      }
-    };
+  // Get real-time subscription updates
+  getSubscriptionUpdatesStream(userId: number): Observable<any> {
+    return this.realtimeService.getSubscriptionUpdates(userId);
   }
 
   async deleteUser(userId: number): Promise<{ message: string }> {

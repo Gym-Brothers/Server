@@ -1,8 +1,15 @@
-import { Controller, Get, Post, Put, Body, Param, Query, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, NotFoundException } from '@nestjs/common';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { Public } from '../decorators/public.decorator';
 import { CoachService } from './coach.service';
-import { CreateCoachDto, UpdateCoachProfileDto, CreateCertificationDto } from '../dto/coach/coach.dto';
+import { 
+  CreateCoachDto, 
+  UpdateCoachProfileDto, 
+  CreateCertificationDto,
+  AddSpecializationDto,
+  UpdateSpecializationDto,
+  CoachReviewDto 
+} from '../dto/coach/coach.dto';
 
 @Controller('coach')
 export class CoachController {
@@ -143,10 +150,131 @@ export class CoachController {
     }
   }
 
+  // NEW: Specialization management endpoints
+  @Get(':id/specializations')
+  async getCoachSpecializations(@Param('id') id: string) {
+    try {
+      const specializations = await this.coachService.getCoachSpecializations(parseInt(id));
+      
+      return {
+        message: 'Coach specializations retrieved successfully',
+        data: specializations,
+      };
+    } catch (error) {
+      throw new Error('Failed to retrieve specializations: ' + error.message);
+    }
+  }
+
+  @Post('specializations')
+  async addSpecialization(@CurrentUser() user: any, @Body() specializationDto: AddSpecializationDto) {
+    try {
+      // Get coach profile first to get coachId
+      const coach = await this.coachService.getMyCoachProfile(user.id);
+      const specialization = await this.coachService.addSpecialization(coach.id, specializationDto);
+      
+      return {
+        message: 'Specialization added successfully',
+        data: specialization,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new Error('Failed to add specialization: ' + error.message);
+    }
+  }
+
+  @Put('specializations/:specializationId')
+  async updateSpecialization(
+    @CurrentUser() user: any, 
+    @Param('specializationId') specializationId: string,
+    @Body() updateDto: UpdateSpecializationDto
+  ) {
+    try {
+      const coach = await this.coachService.getMyCoachProfile(user.id);
+      const updatedSpecialization = await this.coachService.updateSpecialization(
+        coach.id, 
+        parseInt(specializationId), 
+        updateDto
+      );
+      
+      return {
+        message: 'Specialization updated successfully',
+        data: updatedSpecialization,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new Error('Failed to update specialization: ' + error.message);
+    }
+  }
+
+  @Delete('specializations/:specializationId')
+  async removeSpecialization(
+    @CurrentUser() user: any, 
+    @Param('specializationId') specializationId: string
+  ) {
+    try {
+      const coach = await this.coachService.getMyCoachProfile(user.id);
+      const result = await this.coachService.removeSpecialization(coach.id, parseInt(specializationId));
+      
+      return result;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new Error('Failed to remove specialization: ' + error.message);
+    }
+  }
+
+  // NEW: Review management endpoints
+  @Post(':id/reviews')
+  async addReview(
+    @CurrentUser() user: any,
+    @Param('id') coachId: string,
+    @Body() reviewDto: CoachReviewDto
+  ) {
+    try {
+      // Set the clientId from the current user
+      reviewDto.clientId = user.id;
+      
+      const result = await this.coachService.addReview(parseInt(coachId), reviewDto);
+      
+      return {
+        message: 'Review added successfully',
+        data: result,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new Error('Failed to add review: ' + error.message);
+    }
+  }
+
+  @Get('profile/reviews')
+  async getMyReviews(@CurrentUser() user: any) {
+    try {
+      const coach = await this.coachService.getMyCoachProfile(user.id);
+      const reviews = await this.coachService.getMyReviews(coach.id);
+      
+      return {
+        message: 'Reviews retrieved successfully',
+        data: reviews,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new Error('Failed to retrieve reviews: ' + error.message);
+    }
+  }
+
+  // NEW: Certification management endpoint
   @Post('certifications')
   async addCertification(@CurrentUser() user: any, @Body() certificationDto: CreateCertificationDto) {
     try {
-      // First get the coach profile to get coachId
       const coach = await this.coachService.getMyCoachProfile(user.id);
       const certification = await this.coachService.addCertification(coach.id, certificationDto);
       
@@ -155,26 +283,10 @@ export class CoachController {
         data: certification,
       };
     } catch (error) {
-      throw new Error('Failed to add certification: ' + error.message);
-    }
-  }
-
-  @Get('reviews')
-  async getMyReviews(@CurrentUser() user: any) {
-    try {
-      // First get the coach profile to get coachId
-      const coach = await this.coachService.getMyCoachProfile(user.id);
-      const reviews = await this.coachService.getMyReviews(coach.id);
-      
-      return {
-        message: 'Reviews retrieved successfully',
-        ...reviews,
-      };
-    } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new Error('Failed to retrieve reviews: ' + error.message);
+      throw new Error('Failed to add certification: ' + error.message);
     }
   }
 }
