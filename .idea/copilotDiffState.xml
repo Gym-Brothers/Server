@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="$PROJECT_DIR$/jest.config.json">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/jest.config.json" />
+              <option name="updatedContent" value="{&#10;  &quot;moduleFileExtensions&quot;: [&quot;js&quot;, &quot;json&quot;, &quot;ts&quot;],&#10;  &quot;rootDir&quot;: &quot;src&quot;,&#10;  &quot;testRegex&quot;: &quot;.*\\.spec\\.ts$&quot;,&#10;  &quot;transform&quot;: {&#10;    &quot;^.+\\.(t|j)s$&quot;: &quot;ts-jest&quot;&#10;  },&#10;  &quot;collectCoverageFrom&quot;: [&#10;    &quot;**/*.(t|j)s&quot;&#10;  ],&#10;  &quot;coverageDirectory&quot;: &quot;../coverage&quot;,&#10;  &quot;testEnvironment&quot;: &quot;node&quot;,&#10;  &quot;coveragePathIgnorePatterns&quot;: [&#10;    &quot;/node_modules/&quot;,&#10;    &quot;/dist/&quot;,&#10;    &quot;main.ts&quot;,&#10;    &quot;.module.ts&quot;,&#10;    &quot;.entity.ts&quot;,&#10;    &quot;.dto.ts&quot;&#10;  ],&#10;  &quot;setupFilesAfterEnv&quot;: [&quot;&lt;rootDir&gt;/test-setup.ts&quot;],&#10;  &quot;moduleNameMapping&quot;: {&#10;    &quot;^src/(.*)$&quot;: &quot;&lt;rootDir&gt;/$1&quot;&#10;  }&#10;}" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+        <entry key="$PROJECT_DIR$/src/test-setup.ts">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/src/test-setup.ts" />
+              <option name="updatedContent" value="import 'reflect-metadata';&#10;&#10;// Mock environment variables for testing&#10;process.env.JWT_SECRET = 'test-jwt-secret';&#10;process.env.DB_HOST = 'localhost';&#10;process.env.DB_PORT = '5432';&#10;process.env.DB_USERNAME = 'test';&#10;process.env.DB_PASSWORD = 'test';&#10;process.env.DB_NAME = 'test_db';&#10;process.env.AWS_REGION = 'us-east-1';&#10;process.env.AWS_ACCESS_KEY_ID = 'test-key';&#10;process.env.AWS_SECRET_ACCESS_KEY = 'test-secret';&#10;process.env.AWS_S3_BUCKET_NAME = 'test-bucket';&#10;&#10;// Mock external services&#10;jest.mock('aws-sdk');&#10;jest.mock('@aws-sdk/client-s3');&#10;jest.mock('bcryptjs');&#10;&#10;// Global test utilities&#10;global.mockUser = {&#10;  id: 1,&#10;  username: 'testuser',&#10;  email: 'test@example.com',&#10;  firstName: 'Test',&#10;  lastName: 'User',&#10;  coach: { id: 1 }&#10;};&#10;&#10;global.mockCoach = {&#10;  id: 1,&#10;  userId: 1,&#10;  bio: 'Test coach',&#10;  yearsOfExperience: 5,&#10;  hourlyRate: 50.00,&#10;  isVerified: true&#10;};" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>
